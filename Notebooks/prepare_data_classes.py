@@ -10,9 +10,24 @@ random.seed(10) # can set to any integer
 TRAIN_VALIDATION_SPLIT = 0.8 # controls the train validation split
 
 class UnzipFiles:
+    """
+    Used to unzip files to specified locations
+
+    Attributes:
+    - Data_directory: The location of the folder with all the zipped files, the unzipped files will also be
+                      found in this location.
+
+    Methods:
+    - unzip_to_location(location): Unzips the zip file to a specified location.
+    """
+
     Data_directory = os.path.join(os.getcwd(),"Data")
 
     def __init__(self, zip_folder_name: str) -> None:
+        """
+        Attributes:
+        - zip_location: This is the location of the zipped data
+        """
         self.zip_location = os.path.join(UnzipFiles.Data_directory, zip_folder_name)
 
     def unzip_to_location(self, location: str) -> None:
@@ -39,6 +54,17 @@ class UnzipFiles:
                     zip_ref.extractall(self.unzip_location)
 
 class TestCleanUp(UnzipFiles):
+    """
+    This class inherits from UnzipFiles. Used to unzip and clean the test images as there are several
+    unwanted files in the unzip.
+
+    Attributes:
+    - Data_directory: The location of the folder with all the zipped files, the unzipped files will also be
+                      found in this location.
+
+    Methods:
+    - unzip_to_location(location): Unzips the zip file to a specified location.
+    """
 
     def __init__(self, zip_folder_name: str):
         UnzipFiles.__init__(self, zip_folder_name)
@@ -75,14 +101,44 @@ class TestCleanUp(UnzipFiles):
 
 
 class PopulateSubDirectories:
+    """
+    A class used to create train and validation subdirectories with a folders for each class of skin cancer.
+    The class is also used to create a mapping from the meta data to the images so each image has a known class.
+    The images can then be split into train and validation and moved to the corresponding class folders.
+
+    Attributes:
+    - Data_directory: The location of all the data.
+    - Image_directory: The location where all the images are.
+    - classes: A list of all the skin cancer classes.
+
+    Methods:
+    - create_sub_folders(): Uses the class attribute classes to create the required subfolders.
+    - map_images_to_folders(train_validation_split): From a specified training split ratio this splits the data into
+                                                     training and validation data. The method then creates a mapping
+                                                     from the meta data to each image so the class is known. Finally
+                                                     the method moved the image to the correct subfolder based on its
+                                                     class.
+    """
+    
     Data_directory = os.path.join(os.getcwd(),"Data")
     Image_directory = os.path.join(Data_directory, "Images")
     classes = ['bkl', 'nv', 'df', 'mel', 'vasc', 'bcc', 'akiec']
 
     def __init__(self, location) -> None:
+        """
+        Attributes:
+        - location: This is the location to create subfolders and later populate them.
+        """
         self.location = os.path.join(PopulateSubDirectories.Data_directory, location)
 
     def create_sub_folders(self) -> None:
+        """
+        Use: To create a subfolder for each type of skin cancer
+
+        Args: None
+
+        Returns: None
+        """
         
         if not os.path.exists(self.location):
             os.mkdir(self.location)
@@ -91,7 +147,15 @@ class PopulateSubDirectories:
                     os.mkdir(os.path.join(self.location, target))
 
     def map_images_to_folders(self, train_validation_split: float) -> None:
-        
+        """
+        Use: To create a mapping of the images to the classes of skin cancer. The images are then copied to the 
+             subfolders created by "create_sub_folders".
+
+        Args: None
+
+        Returns: None
+        """
+
         list_of_images = os.listdir(PopulateSubDirectories.Image_directory)
         train_images = random.sample(list_of_images, int(train_validation_split*len(list_of_images)))
         validation_image = np.setdiff1d(list_of_images, train_images)
@@ -107,7 +171,7 @@ class PopulateSubDirectories:
         
         mapping_dict = dict(zip(class_list, image_list_in_classes))
 
-        if self.location == "Train":
+        if self.location.split("\\")[-1] == "Train":
             image_set = train_images
         else:
             image_set = validation_image
@@ -117,11 +181,14 @@ class PopulateSubDirectories:
                 if image.split(".")[0] in mapping_dict[target]:
                     current_dir = os.path.join(PopulateSubDirectories.Image_directory, image)
                     target_dir = os.path.join(os.path.join(self.location, target), image)
-                    shutil.move(current_dir, target_dir)
+                    shutil.copyfile(current_dir, target_dir)
 
 if __name__ == "__main__":
+    # the zipped folders that contain images
     folders_to_unzip = ["HAM10000_images_part_1.zip", "HAM10000_images_part_2.zip", "ISIC2018_Task3_Test_Images.zip"]
+    # the 3 folders we want to create
     data_splits = ["Train","Validation","Test"]
+
     for zipped_folder, split in zip(folders_to_unzip, data_splits):
         if zipped_folder == "ISIC2018_Task3_Test_Images.zip":
             clean_test_folder = TestCleanUp(zipped_folder)
@@ -131,4 +198,9 @@ if __name__ == "__main__":
             UnzipFiles(zipped_folder).unzip_to_location("Images")
             populate_split_folders = PopulateSubDirectories(split)
             populate_split_folders.create_sub_folders()
-            populate_split_folders.map_images_to_folders(TRAIN_VALIDATION_SPLIT)
+            
+    for file in ["Train","Validation"]:
+        PopulateSubDirectories(file).map_images_to_folders(TRAIN_VALIDATION_SPLIT)
+
+    # removed the "Image" folder once all files copied across to train and validation subdirectories.
+    shutil.rmtree(PopulateSubDirectories.Image_directory)
